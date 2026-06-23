@@ -1,0 +1,5 @@
+mujoco>=3.1.4    # MjSpec model editing + gripper attach
+numpy>=1.24
+pyyaml>=6.0
+# optional, only for --record (saving the gripper-camera video):
+imageio>=2.31

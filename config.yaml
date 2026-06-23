@@ -1,0 +1,79 @@
+# =============================================================================
+# config.yaml -- single source of truth for the object-tracking simulation
+# -----------------------------------------------------------------------------
+# Task: a UR5e arm with a gripper visually tracks a movable object (the
+# gripper-mounted camera follows it). When the object is left stationary, the
+# arm picks it up and returns it to its original position.
+#
+# All dimensions in METERS, all angles in RADIANS, expressed in the ROBOT BASE
+# frame (origin = UR base mount, z up). This is a closed-loop SIMULATION.
+# =============================================================================
+
+robot:
+  menagerie_ur5e_dir: "mujoco_menagerie/universal_robots_ur5e"
+  ee_site: "attachment_site"          # flange site the gripper attaches to
+  joint_names:
+    - shoulder_pan_joint
+    - shoulder_lift_joint
+    - elbow_joint
+    - wrist_1_joint
+    - wrist_2_joint
+    - wrist_3_joint
+  joint_limits_lower: [-6.2831, -6.2831, -3.1415, -6.2831, -6.2831, -6.2831]
+  joint_limits_upper: [ 6.2831,  6.2831,  3.1415,  6.2831,  6.2831,  6.2831]
+
+gripper:
+  menagerie_2f85_dir: "mujoco_menagerie/robotiq_2f85"
+  open_ctrl: 0.0                      # actuator ctrl when open
+  close_ctrl: 255.0                   # actuator ctrl when closed
+
+# --- environment -------------------------------------------------------------
+base:
+  position: [0.0, 0.0, 0.0]           # UR base mount at the world/base origin
+
+platform:                             # aluminium table the robot is bolted to
+  center: [0.0, 0.0, -0.40]
+  size:   [1.50, 0.45, 0.80]          # length x width x height (m)
+
+floor_z: -0.80                        # floor plane height
+
+# Static obstacles kept from the shared environment (boxes, base frame, m).
+obstacles:
+  - name: "wall"
+    center: [-0.52, 0.0, 0.45]
+    size:   [0.15, 0.30, 0.45]
+  - name: "small_box"
+    center: [-0.45, 0.30, 0.20]
+    size:   [0.15, 0.15, 0.30]
+
+# Work surface in front of the robot (within reach) that the object rests on.
+# The main platform sits under the base and is too narrow in +y, so objects in
+# the workspace would fall; this surface gives them somewhere to sit.
+work_surface:
+  center: [-0.13, 0.45, -0.10]
+  size:   [0.45, 0.45, 0.40]          # top at z = -0.10 + 0.20 = 0.10
+  rgba:   [0.55, 0.45, 0.35, 1.0]
+
+# --- manipulated object ------------------------------------------------------
+object:
+  spawn: [-0.13, 0.45, 0.125]         # initial position = "home" it returns to
+  size:  [0.05, 0.05, 0.05]           # box dimensions (m)
+  mass:  0.2                          # kg
+  rgba:  [0.15, 0.55, 0.95, 1.0]
+
+home_return:
+  position: [-0.13, 0.45, 0.125]      # where the object is placed back (default = spawn)
+
+# --- tracking (gaze) behaviour ----------------------------------------------
+tracking:
+  perch_joints: [-1.5708, -1.5708, 1.5708, -1.5708, -1.5708, 0.0]  # "ready" pose
+  idle_speed: 0.02        # m/s; below this the object is considered stationary
+  idle_time:  1.5         # s; stationary this long => "left" => retrieve
+  move_speed: 0.05        # m/s; reference speed used by the auto object driver
+  gaze_pos_weight: 2.0    # weight to hold the perch position while aiming
+
+# --- pick-and-place parameters ----------------------------------------------
+pick:
+  hover_height: 0.14      # m above the object before descending
+  reach_tol: 0.015        # m; "target reached" tolerance
+  gripper_settle_s: 0.6   # s to open/close the gripper
