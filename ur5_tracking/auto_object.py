@@ -31,7 +31,7 @@ class AutoObjectDriver:
     def _new_target(self):
         return self.rng.uniform(self.lo, self.hi)
 
-    def update(self, d, fsm_state, t, dt):
+    def update(self, fsm_state, t, dt):
         # hand control back to the FSM while the object is being retrieved
         if fsm_state != "TRACK":
             self._moving = False
@@ -48,17 +48,17 @@ class AutoObjectDriver:
             return
 
         ctl = self.ctl
-        cur = ctl.object_pos(d)[:2]
+        cur = ctl.object_pos()[:2]
         delta = self._target - cur
         dist = np.linalg.norm(delta)
         if dist < 0.01:
             # arrived -> leave it (stationary) so the FSM detects "left"
             self._moving = False
             self._cooldown_until = t + 8.0
-            ctl.set_object_pose(d, [self._target[0], self._target[1], self.rest_z], vel=np.zeros(3))
+            ctl.set_object_pose([self._target[0], self._target[1], self.rest_z], vel=np.zeros(3))
             return
         direction = delta / dist
         step = min(self.speed * dt, dist)
         nxt = cur + direction * step
-        ctl.set_object_pose(d, [nxt[0], nxt[1], self.rest_z],
+        ctl.set_object_pose([nxt[0], nxt[1], self.rest_z],
                             vel=[direction[0] * self.speed, direction[1] * self.speed, 0.0])
