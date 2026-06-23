@@ -10,3 +10,11 @@ WARNING Tue Jun 23 20:57:30 2026: Attach conflict when attaching 'robotiq_2f85' 
 impratio: parent has 1, child has 10, keeping parent value
 cone: parent has 0, child has 1, keeping parent value
 
+WARNING Tue Jun 23 19:35:04 2026: Attach conflict when attaching 'robotiq_2f85' to 'ur5e', policy is 'warning'
+impratio: parent has 1, child has 10, keeping parent value
+cone: parent has 0, child has 1, keeping parent value
+
+WARNING Tue Jun 23 19:35:16 2026: Attach conflict when attaching 'robotiq_2f85' to 'ur5e', policy is 'warning'
+impratio: parent has 1, child has 10, keeping parent value
+cone: parent has 0, child has 1, keeping parent value
+

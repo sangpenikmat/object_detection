@@ -3,6 +3,9 @@
 __all__ = [
     "config_loader",
     "object_scene",
+    "robot_interface",
+    "sim_interface",
+    "hardware_interface",
     "track_control",
     "track_states",
     "auto_object",

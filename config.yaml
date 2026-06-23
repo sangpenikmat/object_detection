@@ -27,6 +27,9 @@ gripper:
   open_ctrl: 0.0                      # actuator ctrl when open
   close_ctrl: 255.0                   # actuator ctrl when closed
 
+camera:
+  menagerie_d435i_dir: "mujoco_menagerie/realsense_d435i"
+
 # --- environment -------------------------------------------------------------
 base:
   position: [0.0, 0.0, 0.0]           # UR base mount at the world/base origin
@@ -77,3 +80,26 @@ pick:
   hover_height: 0.14      # m above the object before descending
   reach_tol: 0.015        # m; "target reached" tolerance
   gripper_settle_s: 0.6   # s to open/close the gripper
+
+# --- hardware deployment (Phase 2) ------------------------------------------
+# Uncomment and fill in when deploying to real hardware (Windows, no ROS2).
+# hardware:
+#   arm_ip: "192.168.1.100"       # UR5e controller IP
+#   gripper_port: "COM3"          # USB-to-RS485 serial port for Robotiq
+#   camera_index: 0               # OpenCV camera index
+#   control_hz: 10                # main loop rate on hardware
+#   arm_speed: 0.5                # rad/s for moveJ
+#   arm_accel: 0.3                # rad/s^2 for moveJ
+#   use_servoj: false             # true = stream servoJ in TRACK phase
+#   aruco_dict: "DICT_4X4_50"    # ArUco marker dictionary
+#   marker_id: 0                  # which marker ID is on the object
+#   marker_size_m: 0.05           # printed marker side length (m)
+#   # Fill in after camera calibration (cv2 checkerboard):
+#   camera_matrix: [1.0,0,0, 0,1.0,0, 0,0,1.0]
+#   dist_coeffs: [0,0,0,0,0]
+#   # Fill in after hand-eye calibration (cv2.calibrateHandEye):
+#   # Row-major 4x4 homogeneous transform from camera frame to robot base frame.
+#   T_cam_to_base: [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]
+#   # Noise tuning for real hardware (vision has noise that sim doesn't):
+#   idle_speed_hw: 0.005          # tighter speed threshold (m/s)
+#   idle_time_hw: 3.0             # longer dwell time (s)

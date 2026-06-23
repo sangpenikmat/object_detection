@@ -5,9 +5,6 @@ The arm gaze-tracks a movable object (the gripper-mounted camera follows it).
 When the object is left stationary, the arm picks it up and returns it to its
 original position.
 
-This is a SIMULATION: every step reads the object pose from the simulator's
-ground truth. It is not an open-loop trajectory for a real robot.
-
 Modes:
   python track_and_retrieve.py             # interactive: drag the object (Ctrl + right-drag)
   python track_and_retrieve.py --auto      # the object moves automatically, then is left
@@ -25,6 +22,8 @@ import numpy as np
 
 from ur5_tracking.config_loader import load_config
 from ur5_tracking.object_scene import build_model
+from ur5_tracking.robot_interface import RobotInterface
+from ur5_tracking.sim_interface import SimInterface
 from ur5_tracking.track_control import TrackController
 from ur5_tracking.track_states import RetrieveFSM
 from ur5_tracking.auto_object import AutoObjectDriver
@@ -32,20 +31,21 @@ from ur5_tracking.auto_object import AutoObjectDriver
 CONTROL_EVERY = 5   # run the controller every N physics steps
 
 
-def setup(cfg):
+def setup_sim(cfg):
     model, _ = build_model(cfg)
     data = mujoco.MjData(model)
-    ctl = TrackController(model, cfg)
+    iface = SimInterface(model, data, cfg)
+    ctl = TrackController(model, cfg, iface)
     perch = cfg.arr("tracking", "perch_joints")
-    data.qpos[ctl.qadr] = perch
-    data.ctrl[ctl.arm_act] = perch
-    ctl.set_object_pose(data, cfg.arr("object", "spawn"))
+    data.qpos[iface.qadr] = perch
+    data.ctrl[iface.arm_act] = perch
+    iface.set_object_pose(cfg.arr("object", "spawn"))
     mujoco.mj_forward(model, data)
     return model, data, ctl, RetrieveFSM(ctl, cfg)
 
 
 def run_headless(cfg, seconds, record=None):
-    model, data, ctl, fsm = setup(cfg)
+    model, data, ctl, fsm = setup_sim(cfg)
     driver = AutoObjectDriver(ctl, cfg)
     dt = model.opt.timestep
     renderer = mujoco.Renderer(model, height=480, width=640) if record else None
@@ -53,20 +53,20 @@ def run_headless(cfg, seconds, record=None):
 
     for i in range(int(seconds / dt)):
         if i % CONTROL_EVERY == 0:
-            fsm.update(data)
-            driver.update(data, fsm.state, data.time, dt * CONTROL_EVERY)
+            fsm.update()
+            driver.update(fsm.state, ctl.get_time(), dt * CONTROL_EVERY)
             if fsm.state != last_state:
-                transitions.append((round(data.time, 2), fsm.state))
+                transitions.append((round(ctl.get_time(), 2), fsm.state))
                 # capture placement accuracy at the moment of release
                 if fsm.state == "RETREAT":
-                    placements.append(ctl.object_pos(data).copy())
+                    placements.append(ctl.object_pos().copy())
                 last_state = fsm.state
         mujoco.mj_step(model, data)
         if renderer and i % 20 == 0:
             renderer.update_scene(data, camera="gripper_cam")
             frames.append(renderer.render().copy())
 
-    obj = ctl.object_pos(data)
+    obj = ctl.object_pos()
     home = cfg.arr("home_return", "position")
     cycles = sum(1 for _, st in transitions if st == "GRASP")
     print("State transitions:", transitions)
@@ -88,7 +88,7 @@ def run_headless(cfg, seconds, record=None):
 
 def run_viewer(cfg, auto):
     import mujoco.viewer
-    model, data, ctl, fsm = setup(cfg)
+    model, data, ctl, fsm = setup_sim(cfg)
     driver = AutoObjectDriver(ctl, cfg) if auto else None
     dt = model.opt.timestep
     with mujoco.viewer.launch_passive(model, data) as v:
@@ -96,11 +96,11 @@ def run_viewer(cfg, auto):
         while v.is_running():
             t0 = time.time()
             if i % CONTROL_EVERY == 0:
-                fsm.update(data)
+                fsm.update()
                 if driver:
-                    driver.update(data, fsm.state, data.time, dt * CONTROL_EVERY)
+                    driver.update(fsm.state, ctl.get_time(), dt * CONTROL_EVERY)
                 if fsm.state != last:
-                    print(f"[{data.time:6.2f}s] -> {fsm.state}")
+                    print(f"[{ctl.get_time():6.2f}s] -> {fsm.state}")
                     last = fsm.state
             mujoco.mj_step(model, data)
             v.sync()

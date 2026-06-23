@@ -2,13 +2,14 @@
 
 Starts from the UR5e model and adds:
   - a Robotiq 2F-85 gripper (attached to the flange),
+  - a RealSense D435i depth camera (attached to the gripper, visual only),
   - a free-floating object the user can drag (or a script can move),
   - a camera mounted on the gripper, aligned with the tool approach axis,
   - a WELD equality (object <-> gripper) enabled while grasping (stable hold),
   - visual polish: skybox, checkered floor, materials, lights, shadows, and a
     sensible default viewing angle plus an "overview" camera.
 
-Built with MjSpec so the UR5e and 2F-85 assets resolve automatically.
+Built with MjSpec so the UR5e, 2F-85, and D435i assets resolve automatically.
 
 Note: box sizes in config are FULL extents; MuJoCo uses half-extents, so we
 divide by 2 here.
@@ -150,12 +151,26 @@ def build_scene(cfg: Config) -> "mujoco.MjSpec":
                             size=[float(osz[0] * 0.7), float(osz[1] * 0.7), 0.0015],
                             rgba=[0.2, 0.95, 0.4, 0.55], group=2)
 
-    # --- camera on the gripper -----------------------------------------------
-    # quat [0,1,0,0] (180 deg about x) makes the camera -z look along the tool
-    # approach axis (+z of the pinch site), i.e. wherever the gripper points.
-    spec.body("2f85_base").add_camera(
-        name="gripper_cam", pos=[0.05, 0.0, 0.02], quat=[0, 1, 0, 0],
-        fovy=58, mode=mujoco.mjtCamLight.mjCAMLIGHT_FIXED)
+    # --- D435i depth camera (physical body + gripper_cam sensor) -------------
+    # The D435i is attached to the gripper base and provides the visual model.
+    # gripper_cam is placed on the D435i body so it moves with it.
+    # quat [0,1,0,0] (180° about x) makes the camera look along the tool +z axis.
+    d435i_dir = cfg.menagerie_d435i_dir
+    d435i_xml = os.path.join(d435i_dir, "d435i.xml") if d435i_dir else None
+    if d435i_xml and os.path.exists(d435i_xml):
+        d435i_spec = mujoco.MjSpec.from_file(d435i_xml)
+        mount = spec.body("2f85_base").add_site(
+            name="d435i_mount", pos=[0.0, 0.0, 0.05],
+            quat=[0.7071068, 0.0, 0.7071068, 0.0])  # rotate so D435i lens faces tool +z
+        mount.attach_body(d435i_spec.body("d435i"), "d435i_", "")
+        spec.body("d435i_d435i").add_camera(
+            name="gripper_cam", pos=[0.0, 0.0, 0.0], quat=[0, 1, 0, 0],
+            fovy=87, mode=mujoco.mjtCamLight.mjCAMLIGHT_FIXED)
+    else:
+        # fallback: bare camera with no physical model
+        spec.body("2f85_base").add_camera(
+            name="gripper_cam", pos=[0.05, 0.0, 0.02], quat=[0, 1, 0, 0],
+            fovy=58, mode=mujoco.mjtCamLight.mjCAMLIGHT_FIXED)
 
     # overview camera that always points at the object (auto-frames the action)
     spec.worldbody.add_camera(name="overview", pos=[0.95, -0.85, 0.75],
