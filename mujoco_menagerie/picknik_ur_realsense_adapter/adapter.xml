@@ -15,8 +15,8 @@
   <compiler meshdir="assets" autolimits="true"/>
 
   <asset>
-    <mesh name="adapter_visual"    file="adapter.obj"           scale="0.001 0.001 0.001"/>
-    <mesh name="adapter_collision" file="adapter_collision.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="adapter_visual"    file="adapter.obj"/>
+    <mesh name="adapter_collision" file="adapter_collision.stl"/>
   </asset>
 
   <worldbody>
