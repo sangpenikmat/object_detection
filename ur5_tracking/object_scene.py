@@ -126,10 +126,6 @@ def build_scene(cfg: Config) -> "mujoco.MjSpec":
 
     spec.body("base").pos = cfg.arr("base", "position")
 
-    # attach the gripper to the flange site
-    site = spec.site(cfg.get("robot", "ee_site", default="attachment_site"))
-    site.attach_body(grip.body("base_mount"), "2f85_", "")
-
     _add_visuals(spec, cfg)
     _add_environment(spec, cfg)
 
@@ -151,26 +147,50 @@ def build_scene(cfg: Config) -> "mujoco.MjSpec":
                             size=[float(osz[0] * 0.7), float(osz[1] * 0.7), 0.0015],
                             rgba=[0.2, 0.95, 0.4, 0.55], group=2)
 
-    # --- D435i depth camera (physical body + gripper_cam sensor) -------------
-    # The D435i is attached to the gripper base and provides the visual model.
-    # gripper_cam is placed on the D435i body so it moves with it.
-    # quat [0,1,0,0] (180° about x) makes the camera look along the tool +z axis.
+    # --- PickNik adapter bracket + gripper + D435i (eye-in-hand) -------------
+    # Kinematic chain: UR5e flange → adapter bracket → gripper  (at bracket tool0, +7 mm)
+    #                                                → D435i    (at bracket camera_mount)
+    # Falls back to direct flange attach if the adapter dir is absent.
+    adapter_dir = cfg.menagerie_adapter_dir
+    adapter_xml = os.path.join(adapter_dir, "adapter.xml") if adapter_dir else None
     d435i_dir = cfg.menagerie_d435i_dir
     d435i_xml = os.path.join(d435i_dir, "d435i.xml") if d435i_dir else None
-    if d435i_xml and os.path.exists(d435i_xml):
-        d435i_spec = mujoco.MjSpec.from_file(d435i_xml)
-        mount = spec.body("2f85_base").add_site(
-            name="d435i_mount", pos=[0.0, 0.0, 0.05],
-            quat=[0.7071068, 0.0, 0.7071068, 0.0])  # rotate so D435i lens faces tool +z
-        mount.attach_body(d435i_spec.body("d435i"), "d435i_", "")
-        spec.body("d435i_d435i").add_camera(
-            name="gripper_cam", pos=[0.0, 0.0, 0.0], quat=[0, 1, 0, 0],
-            fovy=87, mode=mujoco.mjtCamLight.mjCAMLIGHT_FIXED)
+    ee_site_name = cfg.get("robot", "ee_site", default="attachment_site")
+
+    if adapter_xml and os.path.exists(adapter_xml):
+        adapter_spec = mujoco.MjSpec.from_file(adapter_xml)
+        spec.site(ee_site_name).attach_body(adapter_spec.body("adapter"), "adapter_", "")
+        # gripper hangs off bracket's tool0 site (7 mm further along tool axis)
+        spec.site("adapter_tool0").attach_body(grip.body("base_mount"), "2f85_", "")
+        # camera hangs off bracket's camera_mount site (side-mounted at URDF angles)
+        if d435i_xml and os.path.exists(d435i_xml):
+            d435i_spec = mujoco.MjSpec.from_file(d435i_xml)
+            spec.site("adapter_camera_mount").attach_body(d435i_spec.body("d435i"), "d435i_", "")
+            spec.body("d435i_d435i").add_camera(
+                name="gripper_cam", pos=[0.0, 0.0, 0.0], quat=[1, 0, 0, 0],
+                fovy=87, mode=mujoco.mjtCamLight.mjCAMLIGHT_FIXED)
+        else:
+            spec.body("adapter_adapter").add_camera(
+                name="gripper_cam",
+                pos=[0.0, -0.067, 0.0171],
+                quat=[0.5255, 0.4732, -0.4732, 0.5255],
+                fovy=87, mode=mujoco.mjtCamLight.mjCAMLIGHT_FIXED)
     else:
-        # fallback: bare camera with no physical model
-        spec.body("2f85_base").add_camera(
-            name="gripper_cam", pos=[0.05, 0.0, 0.02], quat=[0, 1, 0, 0],
-            fovy=58, mode=mujoco.mjtCamLight.mjCAMLIGHT_FIXED)
+        # no bracket — attach gripper directly to flange
+        spec.site(ee_site_name).attach_body(grip.body("base_mount"), "2f85_", "")
+        if d435i_xml and os.path.exists(d435i_xml):
+            d435i_spec = mujoco.MjSpec.from_file(d435i_xml)
+            mount = spec.body("2f85_base").add_site(
+                name="d435i_mount", pos=[0.0, 0.0, 0.05],
+                quat=[0.7071068, 0.0, 0.7071068, 0.0])
+            mount.attach_body(d435i_spec.body("d435i"), "d435i_", "")
+            spec.body("d435i_d435i").add_camera(
+                name="gripper_cam", pos=[0.0, 0.0, 0.0], quat=[0, 1, 0, 0],
+                fovy=87, mode=mujoco.mjtCamLight.mjCAMLIGHT_FIXED)
+        else:
+            spec.body("2f85_base").add_camera(
+                name="gripper_cam", pos=[0.05, 0.0, 0.02], quat=[0, 1, 0, 0],
+                fovy=58, mode=mujoco.mjtCamLight.mjCAMLIGHT_FIXED)
 
     # overview camera that always points at the object (auto-frames the action)
     spec.worldbody.add_camera(name="overview", pos=[0.95, -0.85, 0.75],
