@@ -9,4 +9,5 @@ __all__ = [
     "track_control",
     "track_states",
     "auto_object",
+    "aruco_detector",
 ]
