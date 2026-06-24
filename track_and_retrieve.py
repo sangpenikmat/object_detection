@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
-"""UR5e object tracking + retrieval simulation (MuJoCo, closed-loop).
+"""UR5e object tracking + retrieval — simulation and hardware.
 
 The arm gaze-tracks a movable object (the gripper-mounted camera follows it).
 When the object is left stationary, the arm picks it up and returns it to its
 original position.
 
-Modes:
-  python track_and_retrieve.py             # interactive: drag the object (Ctrl + right-drag)
-  python track_and_retrieve.py --auto      # the object moves automatically, then is left
-  python track_and_retrieve.py --headless --seconds 30          # no display (verification)
-  python track_and_retrieve.py --headless --seconds 30 --record out.mp4   # record gripper cam
+Simulation modes:
+  python track_and_retrieve.py                              # interactive (drag the object)
+  python track_and_retrieve.py --auto                       # object moves automatically
+  python track_and_retrieve.py --headless --seconds 30      # headless verification
+  python track_and_retrieve.py --headless --seconds 30 --record out.mp4
+
+Hardware mode (Phase 2 — requires ur-rtde, pyrobotiqgripper, pyrealsense2):
+  python track_and_retrieve.py --hardware
 """
 from __future__ import annotations
 
@@ -24,6 +27,7 @@ from ur5_tracking.config_loader import load_config
 from ur5_tracking.object_scene import build_model
 from ur5_tracking.robot_interface import RobotInterface
 from ur5_tracking.sim_interface import SimInterface
+from ur5_tracking.hardware_interface import HardwareInterface
 from ur5_tracking.track_control import TrackController
 from ur5_tracking.track_states import RetrieveFSM
 from ur5_tracking.auto_object import AutoObjectDriver
@@ -110,17 +114,46 @@ def run_viewer(cfg, auto):
                 time.sleep(lag)
 
 
+def run_hardware(cfg) -> None:
+    """Hardware control loop — connects to real UR5e, gripper, and D435i."""
+    model, _ = build_model(cfg)
+    iface = HardwareInterface(model, cfg)
+    iface.connect()
+    ctl = TrackController(model, cfg, iface)
+    fsm = RetrieveFSM(ctl, cfg)
+    dt = 1.0 / float(cfg.get("hardware", "control_hz", default=10))
+    last_state = None
+    print("[HW] Starting hardware control loop. Ctrl-C to stop.")
+    try:
+        while True:
+            t0 = time.monotonic()
+            fsm.update()
+            if fsm.state != last_state:
+                print(f"[{iface.get_time():.2f}s] -> {fsm.state}")
+                last_state = fsm.state
+            elapsed = time.monotonic() - t0
+            time.sleep(max(0.0, dt - elapsed))
+    except KeyboardInterrupt:
+        print("\n[HW] Interrupted.")
+    finally:
+        iface.disconnect()
+
+
 def main():
-    ap = argparse.ArgumentParser(description="UR5e object tracking + retrieval (MuJoCo)")
+    ap = argparse.ArgumentParser(description="UR5e object tracking + retrieval")
     ap.add_argument("--config", default="config.yaml")
-    ap.add_argument("--auto", action="store_true", help="move the object automatically")
-    ap.add_argument("--headless", action="store_true", help="run without a display (verification)")
-    ap.add_argument("--seconds", type=float, default=25.0)
-    ap.add_argument("--record", default=None, help="save gripper-camera video (mp4)")
+    ap.add_argument("--hardware", action="store_true",
+                    help="run on real hardware (requires ur-rtde, pyrobotiqgripper, pyrealsense2)")
+    ap.add_argument("--auto", action="store_true", help="(sim) move the object automatically")
+    ap.add_argument("--headless", action="store_true", help="(sim) run without a display")
+    ap.add_argument("--seconds", type=float, default=25.0, help="(sim) headless run duration")
+    ap.add_argument("--record", default=None, help="(sim) save gripper-camera video (mp4)")
     args = ap.parse_args()
 
     cfg = load_config(args.config)
-    if args.headless:
+    if args.hardware:
+        run_hardware(cfg)
+    elif args.headless:
         run_headless(cfg, args.seconds, args.record)
     else:
         run_viewer(cfg, auto=args.auto)

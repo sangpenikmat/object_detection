@@ -29,6 +29,7 @@ gripper:
 
 camera:
   menagerie_d435i_dir: "mujoco_menagerie/realsense_d435i"
+  menagerie_adapter_dir: "mujoco_menagerie/picknik_ur_realsense_adapter"
 
 # --- environment -------------------------------------------------------------
 base:
