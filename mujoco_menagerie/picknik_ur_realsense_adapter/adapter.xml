@@ -1,0 +1,44 @@
+<mujoco model="picknik_ur_realsense_adapter">
+  <!--
+    PickNik UR RealSense Camera Adapter bracket.
+    Source: https://github.com/PickNikRobotics/picknik_accessories
+            descriptions/brackets/ur_realsense_camera_adapter
+
+    Kinematic sites (in bracket body frame):
+      tool0        — where the Robotiq 2F-85 re-attaches  (z = +7 mm)
+      camera_mount — where the RealSense D435i attaches
+                     xyz = [0, -0.067, 0.0171]
+                     rpy = [0, -pi/2 + 0.1047, pi/2]  (URDF convention)
+                     quat [w,x,y,z] = [0.5255, 0.4732, -0.4732, 0.5255]
+  -->
+
+  <compiler meshdir="assets" autolimits="true"/>
+
+  <asset>
+    <mesh name="adapter_visual"    file="adapter.obj"/>
+    <mesh name="adapter_collision" file="adapter_collision.stl"/>
+  </asset>
+
+  <worldbody>
+    <body name="adapter">
+      <!-- visual mesh (group 1 = visible in GUI) -->
+      <geom name="adapter_visual"    type="mesh" mesh="adapter_visual"
+            contype="0" conaffinity="0" group="1"
+            rgba="0.4 0.4 0.45 1.0"/>
+      <!-- collision mesh -->
+      <geom name="adapter_collision" type="mesh" mesh="adapter_collision"
+            contype="1" conaffinity="1" group="3" mass="0.12"
+            rgba="0.4 0.4 0.45 0.0"/>
+
+      <!-- gripper re-attaches 7 mm further along tool axis -->
+      <site name="tool0" pos="0 0 0.007" size="0.001"/>
+
+      <!-- D435i mount: offset side-mounted, optical axis aimed along tool +Z
+           quat = Rx(-90°) * q_urdf so D435i +Z (optical) → bracket +Z (workspace) -->
+      <site name="camera_mount"
+            pos="0 -0.067 0.0171"
+            quat="0.706139 -0.036979 0.036979 0.706139"
+            size="0.001"/>
+    </body>
+  </worldbody>
+</mujoco>

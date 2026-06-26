@@ -52,6 +52,16 @@ class Config:
         return self.abspath(self.require("gripper", "menagerie_2f85_dir"))
 
     @property
+    def menagerie_d435i_dir(self) -> str | None:
+        path = self.get("camera", "menagerie_d435i_dir", default=None)
+        return self.abspath(path) if path is not None else None
+
+    @property
+    def menagerie_adapter_dir(self) -> str | None:
+        path = self.get("camera", "menagerie_adapter_dir", default=None)
+        return self.abspath(path) if path is not None else None
+
+    @property
     def joint_names(self) -> List[str]:
         return list(self.require("robot", "joint_names"))
 
